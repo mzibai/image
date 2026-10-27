@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>我的图片集</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, "Microsoft YaHei", sans-serif;
+            background: #0f0f12;
+            color: #e8e8e8;
+            padding: 28px 20px 60px;
+        }
+        h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+        .meta { color: #8a8a92; font-size: 13px; margin-bottom: 22px; }
+
+        /* ✅ 横向排序：Flex 布局 */
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .card {
+            width: calc(25% - 12px);   /* 一行 4 张 */
+            min-width: 180px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #1a1a20;
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+        @media (max-width: 1100px) {
+            .card { width: calc(33.333% - 11px); } /* 中等屏 3 张 */
+        }
+        @media (max-width: 760px) {
+            .card { width: calc(50% - 8px); }      /* 小屏 2 张 */
+        }
+        @media (max-width: 480px) {
+            .card { width: 100%; }                 /* 手机 1 张 */
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 28px rgba(0,0,0,.5);
+        }
+
+        .card img {
+            width: 100%;
+            display: block;
+            loading: lazy;
+        }
+
+        .card .name {
+            padding: 8px 11px;
+            font-size: 12px;
+            color: #9a9aa2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 放大预览 */
+        #mask {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.88);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99;
+            backdrop-filter: blur(6px);
+        }
+        #mask.show { display: flex; }
+        #mask img {
+            max-width: 92vw;
+            max-height: 90vh;
+            border-radius: 8px;
+        }
+        #mask .close {
+            position: fixed;
+            top: 18px; right: 26px;
+            font-size: 30px;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        #tip {
+            text-align: center;
+            color: #6a6a72;
+            font-size: 14px;
+            padding: 40px 0;
+        }
+    </style>
+</head>
+<body>
+    
+    <h1>📷 图片集</h1>
+    <div class="meta" id="meta">正在加载图片列表…</div>
+    <div class="grid" id="grid"></div>
+    <div id="tip"></div>
+    
+    <div id="mask">
+        <span class="close" id="close">×</span>
+        <img id="big" src="">
+    </div>
+    
+    <script>
+        const grid = document.getElementById('grid');
+        const meta = document.getElementById('meta');
+        const tip  = document.getElementById('tip');
+        const mask = document.getElementById('mask');
+        const big  = document.getElementById('big');
+
+        const IMG_RE = /\.(jpe?g|png|gif|webp|avif|heic|svg)$/i;
+
+        fetch('list.txt')
+            .then(r => {
+                if (!r.ok) throw new Error('list.txt 读取失败');
+                return r.text();
+            })
+            .then(txt => {
+                const files = txt
+                    .split(/\r?\n/)
+                    .map(s => s.trim())
+                    .filter(s => s && IMG_RE.test(s));
+
+                if (!files.length) {
+                    tip.textContent = 'list.txt 里没找到图片，检查一下文件名和后缀～';
+                    meta.textContent = '';
+                    return;
+                }
+
+                meta.textContent = `共 ${files.length} 张 · 点击图片放大`;
+
+                files.forEach(name => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+
+                    const img = new Image();
+                    img.src = name;
+                    img.alt = name;
+                    img.loading = 'lazy';
+                    img.onerror = () => { card.style.display = 'none'; };
+                    img.onclick = () => {
+                        big.src = name;
+                        mask.classList.add('show');
+                    };
+
+                    const lab = document.createElement('div');
+                    lab.className = 'name';
+                    lab.textContent = name;
+
+                    card.appendChild(img);
+                    card.appendChild(lab);
+                    grid.appendChild(card);
+                });
+            })
+            .catch(err => {
+                meta.textContent = '';
+                tip.innerHTML =
+                    '⚠️ 没能读到 list.txt。<br>' +
+                    '请确认 index.html 和 list.txt 在同一个文件夹。<br>' +
+                    '<small>' + err.message + '</small>';
+                console.error(err);
+            });
+
+        mask.onclick = () => mask.classList.remove('show');
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') mask.classList.remove('show');
+        });
+    </script>
+
+</body>
+</html>
