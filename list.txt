@@ -77,4 +77,3 @@
 only1.jpg
 only2.jpg
 only3.jpg
-only4.jpg
