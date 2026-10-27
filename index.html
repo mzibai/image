@@ -9,57 +9,57 @@
         body {
             font-family: system-ui, "Microsoft YaHei", sans-serif;
             background: #0f0f12;
-            color: #e8e8e8;
+            color: #e8e8ea;
             padding: 28px 20px 60px;
         }
+
+        /* 整体居中限宽，解决“左右不对等/贴边” */
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
         h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
         .meta { color: #8a8a92; font-size: 13px; margin-bottom: 22px; }
 
-        /* ✅ 横向排序：Flex 布局 */
+        /* 网格：等宽等高，懒加载友好，不会像瀑布流左右不齐 */
         .grid {
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 16px;
         }
 
         .card {
-            width: calc(25% - 12px);   /* 一行 4 张 */
-            min-width: 180px;
+            aspect-ratio: 1 / 1;
             border-radius: 12px;
             overflow: hidden;
             background: #1a1a20;
             cursor: pointer;
             transition: transform .18s ease, box-shadow .18s ease;
+            position: relative;
         }
-
-        @media (max-width: 1100px) {
-            .card { width: calc(33.333% - 11px); } /* 中等屏 3 张 */
-        }
-        @media (max-width: 760px) {
-            .card { width: calc(50% - 8px); }      /* 小屏 2 张 */
-        }
-        @media (max-width: 480px) {
-            .card { width: 100%; }                 /* 手机 1 张 */
-        }
-
-        .card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 28px rgba(0,0,0,.5);
-        }
+        .card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,.5); }
 
         .card img {
             width: 100%;
+            height: 100%;
             display: block;
+            object-fit: cover;   /* 相册整齐；如要原比例改 contain（会有留白） */
             loading: lazy;
+            decoding: async;
         }
 
         .card .name {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
             padding: 8px 11px;
             font-size: 12px;
             color: #9a9aa2;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            background: linear-gradient(to top, rgba(0,0,0,.55), rgba(0,0,0,0));
+            pointer-events: none;
         }
 
         /* 放大预览 */
@@ -73,18 +73,54 @@
             backdrop-filter: blur(6px);
         }
         #mask.show { display: flex; }
-        #mask img {
+
+        #imgWrap {
+            position: relative;
+            max-width: 92vw;
+            max-height: 90vh;
+        }
+        #imgWrap img {
             max-width: 92vw;
             max-height: 90vh;
             border-radius: 8px;
+            display: block;
         }
-        #mask .close {
-            position: fixed;
-            top: 18px; right: 26px;
-            font-size: 30px;
-            color: #fff;
+
+        /* 关闭按钮 */
+        #close {
+            position: fixed; top: 18px; right: 26px;
+            font-size: 30px; color: #fff; cursor: pointer; user-select: none;
+            z-index: 102;
+        }
+
+        /* ✅ 下载按钮：在“图片容器左上角”（不是窗口右下角） */
+        #dl {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 103;
+
+            width: 42px;
+            height: 42px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+
+            background: rgba(0,0,0,.55);
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 12px;
             cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: background .18s ease, transform .18s ease;
+            color: #fff;
+            text-decoration: none;
         }
+        #dl:hover {
+            background: rgba(0,0,0,.75);
+            transform: scale(1.08);
+        }
+        #dl.show { display: flex; }
+        #dl svg { width: 20px; height: 20px; fill: #fff; }
 
         #tip {
             text-align: center;
@@ -92,85 +128,119 @@
             font-size: 14px;
             padding: 40px 0;
         }
+
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+        }
     </style>
 </head>
 <body>
-    
+
+<div class="wrap">
     <h1>📷 图片集</h1>
     <div class="meta" id="meta">正在加载图片列表…</div>
     <div class="grid" id="grid"></div>
     <div id="tip"></div>
-    
-    <div id="mask">
-        <span class="close" id="close">×</span>
+</div>
+
+<div id="mask">
+    <span class="close" id="close">×</span>
+    <div id="imgWrap">
         <img id="big" src="">
+        <a id="dl" title="下载原图">
+            <svg viewBox="0 0 24 24">
+                <path d="M12 3v12.5l-4.1-4.1-1.4 1.4L12 18.3l5.5-5.5-1.4-1.4L13 15.5V3h-1z"/>
+                <path d="M4 20h16v-2H4v2z"/>
+            </svg>
+        </a>
     </div>
-    
-    <script>
-        const grid = document.getElementById('grid');
-        const meta = document.getElementById('meta');
-        const tip  = document.getElementById('tip');
-        const mask = document.getElementById('mask');
-        const big  = document.getElementById('big');
+</div>
 
-        const IMG_RE = /\.(jpe?g|png|gif|webp|avif|heic|svg)$/i;
+<script>
+    const grid = document.getElementById('grid');
+    const meta = document.getElementById('meta');
+    const tip  = document.getElementById('tip');
+    const mask = document.getElementById('mask');
+    const big  = document.getElementById('big');
+    const dl   = document.getElementById('dl');
+    const closeBtn = document.getElementById('close');
 
-        fetch('list.txt')
-            .then(r => {
-                if (!r.ok) throw new Error('list.txt 读取失败');
-                return r.text();
-            })
-            .then(txt => {
-                const files = txt
-                    .split(/\r?\n/)
-                    .map(s => s.trim())
-                    .filter(s => s && IMG_RE.test(s));
+    const IMG_RE = /\.(jpe?g|png|gif|webp|avif|heic|svg)$/i;
 
-                if (!files.length) {
-                    tip.textContent = 'list.txt 里没找到图片，检查一下文件名和后缀～';
-                    meta.textContent = '';
-                    return;
-                }
+    fetch('list.txt')
+        .then(r => {
+            if (!r.ok) throw new Error('list.txt 读取失败');
+            return r.text();
+        })
+        .then(txt => {
+            const files = txt
+                .split(/\r?\n/)
+                .map(s => s.trim())
+                .filter(s => s && IMG_RE.test(s));
 
-                meta.textContent = `共 ${files.length} 张 · 点击图片放大`;
-
-                files.forEach(name => {
-                    const card = document.createElement('div');
-                    card.className = 'card';
-
-                    const img = new Image();
-                    img.src = name;
-                    img.alt = name;
-                    img.loading = 'lazy';
-                    img.onerror = () => { card.style.display = 'none'; };
-                    img.onclick = () => {
-                        big.src = name;
-                        mask.classList.add('show');
-                    };
-
-                    const lab = document.createElement('div');
-                    lab.className = 'name';
-                    lab.textContent = name;
-
-                    card.appendChild(img);
-                    card.appendChild(lab);
-                    grid.appendChild(card);
-                });
-            })
-            .catch(err => {
+            if (!files.length) {
+                tip.textContent = 'list.txt 里没找到图片，检查一下文件名和后缀～';
                 meta.textContent = '';
-                tip.innerHTML =
-                    '⚠️ 没能读到 list.txt。<br>' +
-                    '请确认 index.html 和 list.txt 在同一个文件夹。<br>' +
-                    '<small>' + err.message + '</small>';
-                console.error(err);
-            });
+                return;
+            }
 
-        mask.onclick = () => mask.classList.remove('show');
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') mask.classList.remove('show');
+            meta.textContent = `共 ${files.length} 张 · 点击图片放大（懒加载）`;
+
+            files.forEach(name => {
+                const card = document.createElement('div');
+                card.className = 'card';
+
+                const img = new Image();
+                img.src = name;
+                img.alt = name;
+                img.loading = 'lazy';
+                img.decoding = 'async';
+                img.onerror = () => { card.style.display = 'none'; };
+
+                img.onclick = () => {
+                    big.src = name;
+                    const fileName = name.split('/').pop();
+                    dl.href = name;
+                    dl.download = fileName;
+                    mask.classList.add('show');
+                    dl.classList.add('show');
+                };
+
+                const lab = document.createElement('div');
+                lab.className = 'name';
+                lab.textContent = name;
+
+                card.appendChild(img);
+                card.appendChild(lab);
+                grid.appendChild(card);
+            });
+        })
+        .catch(err => {
+            meta.textContent = '';
+            tip.innerHTML =
+                '⚠️ 没能读到 list.txt。<br>' +
+                '请确认 index.html 和 list.txt 在同一个文件夹，或用本地/同域服务打开。<br>' +
+                '<small>' + err.message + '</small>';
+            console.error(err);
         });
-    </script>
+
+    function closeMask() {
+        mask.classList.remove('show');
+        dl.classList.remove('show');
+        // 可选：避免关闭后还占着原图
+        // big.src = '';
+    }
+
+    mask.onclick = (e) => {
+        // 只点遮罩背景/关闭号才关；点大图、点下载按钮不关
+        if (e.target === mask || e.target === closeBtn) closeMask();
+    };
+    closeBtn.onclick = closeMask;
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeMask();
+    });
+</script>
 
 </body>
 </html>
